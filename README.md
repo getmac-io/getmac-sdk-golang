@@ -43,12 +43,12 @@ func main() {
         fmt.Println(vm.ID, vm.Name)
     }
 
-    // Create VM
+    // Create VM from a runner label. The label selects the image and the
+    // machine type; set Type only to override the machine type.
     req := &getmac.CreateVirtualMachineRequest{
         Name:   "test",
-        Image:  "macos-sequoia",
+        Image:  "getmac-tahoe",
         Region: "eu-central-ltu-1",
-        Type:   "mac-m4-c4-m8",
     }
     _, vm, err := vmsService.Create(ctx, projectID, req)
     if err != nil {
@@ -56,6 +56,44 @@ func main() {
     }
 
     fmt.Printf("Created VM: %+v\n", vm)
+}
+```
+
+## Images and Machine Types
+
+`CreateVirtualMachineRequest.Image` accepts either:
+
+- a **GetMac runner label**, the same names you use in GitHub Actions `runs-on`, such as `getmac`, `getmac-tahoe` or `getmac-sequoia`. GetMac maps each label to an image and a machine type, so `Type` can be left empty.
+- an **image slug**, such as `macos-tahoe` or `macos-sequoia`. An image slug doesn't imply a machine type, so `Type` is required (for example `mac-m4-c4-m8`).
+
+A `Type` you set always takes precedence over the label's machine type.
+
+> **Note:** Labels in `Image` require a GetMac API version with label support. Older API versions accept only image slugs and always require `Type`.
+
+## Errors
+
+When the API responds with an unexpected status code, methods return a `*getmac.APIError` with the status code and the reason the API gave:
+
+```go
+_, _, err := vmsService.Create(ctx, projectID, req)
+
+var apiErr *getmac.APIError
+if errors.As(err, &apiErr) {
+    fmt.Println(apiErr.StatusCode, apiErr.Message) // 400 Image or label getmac-nope not found
+}
+```
+
+Errors for resources that don't exist wrap `getmac.ErrNotFound`. That covers a `404` response and `GetByName` finding no virtual machine with the name:
+
+```go
+_, vm, err := vmsService.GetByName(ctx, projectID, "my-vm")
+switch {
+case errors.Is(err, getmac.ErrNotFound):
+    // no virtual machine named "my-vm"
+case err != nil:
+    log.Fatal(err)
+default:
+    fmt.Println(vm.ID)
 }
 ```
 
