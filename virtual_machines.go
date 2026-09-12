@@ -20,6 +20,12 @@ type VirtualMachine struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+// CreateVirtualMachineRequest describes a virtual machine to create.
+//
+// Image is either a GetMac runner label, the names GitHub Actions uses in
+// runs-on (for example "getmac" or "getmac-tahoe"), or an image slug (for
+// example "macos-tahoe"). A label also selects the machine type, so Type can be
+// left empty to use it; an image slug needs Type.
 type CreateVirtualMachineRequest struct {
 	Name   string `json:"name"`
 	Image  string `json:"image"`
@@ -45,7 +51,7 @@ func (s *virtualMachinesService) Create(
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return resp, nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return resp, nil, newAPIError(resp)
 	}
 
 	var virtualMachine VirtualMachine
@@ -66,7 +72,7 @@ func (s *virtualMachinesService) Get(
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return resp, nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return resp, nil, newAPIError(resp)
 	}
 
 	var virtualMachine VirtualMachine
@@ -77,11 +83,13 @@ func (s *virtualMachinesService) Get(
 	return resp, &virtualMachine, nil
 }
 
+// GetByName returns the virtual machine with the given name. The error wraps
+// ErrNotFound when no virtual machine has that name.
 func (s *virtualMachinesService) GetByName(
 	ctx context.Context, projectID string, name string) (*http.Response, *VirtualMachine, error) {
 	resp, vms, err := s.List(ctx, projectID)
 	if err != nil {
-		return nil, nil, err
+		return resp, nil, err
 	}
 
 	for _, vm := range vms {
@@ -92,7 +100,7 @@ func (s *virtualMachinesService) GetByName(
 		return resp, vm, nil
 	}
 
-	return resp, nil, fmt.Errorf("virtual machine with name %s not found", name)
+	return resp, nil, fmt.Errorf("virtual machine with name %s %w", name, ErrNotFound)
 }
 
 func (s *virtualMachinesService) Delete(
@@ -104,7 +112,7 @@ func (s *virtualMachinesService) Delete(
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return resp, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return resp, newAPIError(resp)
 	}
 
 	return resp, nil
@@ -120,7 +128,7 @@ func (s *virtualMachinesService) List(
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return resp, nil, newAPIError(resp)
 	}
 
 	var listResp ListVirtualMachinesResponse
@@ -141,7 +149,7 @@ func (s *virtualMachinesService) Start(
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return resp, newAPIError(resp)
 	}
 
 	return resp, nil
@@ -157,7 +165,7 @@ func (s *virtualMachinesService) Stop(
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return resp, newAPIError(resp)
 	}
 
 	return resp, nil
